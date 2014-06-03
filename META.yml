@@ -38,16 +38,16 @@ no_index:
 provides:
   Locale::Babelfish:
     file: lib/Locale/Babelfish.pm
-    version: 0.02
+    version: 0.03
   Locale::Babelfish::Lang::en_US:
     file: lib/Locale/Babelfish/Lang/en_US.pm
-    version: 0.02
+    version: 0.03
   Locale::Babelfish::Lang::ru_RU:
     file: lib/Locale/Babelfish/Lang/ru_RU.pm
-    version: 0.02
+    version: 0.03
   Locale::Babelfish::Maketext:
     file: lib/Locale/Babelfish/Maketext.pm
-    version: 0.02
+    version: 0.03
 requires:
   Carp: 0
   Class::Accessor::Grouped: 0
@@ -63,4 +63,4 @@ resources:
   bugtracker: https://github.com/regru/Locale-Babelfish/issues
   homepage: https://metacpan.org/release/Locale-Babelfish
   repository: git://github.com/regru/Locale-Babelfish.git
-version: 0.02
+version: 0.03

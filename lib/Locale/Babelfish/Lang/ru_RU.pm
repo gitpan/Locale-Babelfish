@@ -5,7 +5,7 @@ package Locale::Babelfish::Lang::ru_RU;
 use parent 'Locale::Babelfish::Maketext';
 use strict;
 
-our $VERSION = '0.02'; # VERSION
+our $VERSION = '0.03'; # VERSION
 
 
 sub quant_word {
@@ -34,7 +34,7 @@ Locale::Babelfish::Lang::ru_RU - ru_RU language
 
 =head1 VERSION
 
-version 0.02
+version 0.03
 
 =for Pod::Coverage quant_word
 

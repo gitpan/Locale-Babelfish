@@ -12,7 +12,7 @@ use Locale::Babelfish::Maketext;
 use YAML::Tiny;
 use Carp qw/ confess /;
 
-our $VERSION = '0.02'; # VERSION
+our $VERSION = '0.03'; # VERSION
 
 our $EMPTY_VALUE = '_EMPTY_';
 
@@ -346,7 +346,7 @@ Locale::Babelfish - wrapper between Locale::Maketext::Lexicon and github://nodec
 
 =head1 VERSION
 
-version 0.02
+version 0.03
 
 =head1 SYNOPSIS
 
@@ -391,8 +391,9 @@ frontend.
 
 =head2 new
 
-Constructor.
-Locale::Babelfish->new( {
+Constructor
+
+my $bf = Locale::Babelfish->new( {
                             dirs => [ '/path/to/dictionaries' ], # is required
                             suffix => 'yaml', # dictionaries extension
                             default_lang => 'ru_RU', # by default en_US
@@ -428,6 +429,7 @@ Check exist or not key in dictionary.
 Where C<main> - is dictionary, C<key.subkey> - key at dictionary.
 
 =head2 maketext
+
     same as t, but parameters for substitute are sequential
     $self->maketext( 'dict', 'key.subkey ' , $param1, ... $paramN );
     Where C<dict> - is dictionary, C<key.subkey> - key at dictionary.

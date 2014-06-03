@@ -3,7 +3,7 @@ NAME
     github://nodeca/babelfish format
 
 VERSION
-    version 0.02
+    version 0.03
 
 SYNOPSIS
         package Foo;
@@ -44,9 +44,11 @@ DESCRIPTION
 
 METHODS
   new
-    Constructor. Locale::Babelfish->new( { dirs => [ '/path/to/dictionaries'
-    ], # is required suffix => 'yaml', # dictionaries extension default_lang
-    => 'ru_RU', # by default en_US langs => [ 'de_DE', 'fr_FR', 'uk_UA' =>
+    Constructor
+
+    my $bf = Locale::Babelfish->new( { dirs => [ '/path/to/dictionaries' ],
+    # is required suffix => 'yaml', # dictionaries extension default_lang =>
+    'ru_RU', # by default en_US langs => [ 'de_DE', 'fr_FR', 'uk_UA' =>
     'Foo::Bar::Lang::uk_UA' ] }, $logger );
 
   set_context_lang
@@ -75,9 +77,10 @@ METHODS
     Where "main" - is dictionary, "key.subkey" - key at dictionary.
 
   maketext
-    same as t, but parameters for substitute are sequential
-    $self->maketext( 'dict', 'key.subkey ' , $param1, ... $paramN );
-    Where "dict" - is dictionary, "key.subkey" - key at dictionary.
+        same as t, but parameters for substitute are sequential
+        $self->maketext( 'dict', 'key.subkey ' , $param1, ... $paramN );
+        Where C<dict> - is dictionary, C<key.subkey> - key at dictionary.
+
 DICTIONARIES
   Phrases Syntax
     #{varname} Echoes value of variable ((Singular|Plural1|Plural2)):count
