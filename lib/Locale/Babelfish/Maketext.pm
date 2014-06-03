@@ -7,7 +7,7 @@ use Modern::Perl;
 use Carp;
 use parent 'Locale::Maketext';
 
-our $VERSION = '0.03'; # VERSION
+our $VERSION = '0.04'; # VERSION
 
 
 sub create_lh {
@@ -110,7 +110,7 @@ Locale::Babelfish::Maketext - Wrapper around Locale::Maketext
 
 =head1 VERSION
 
-version 0.03
+version 0.04
 
 =head1 METHODS
 

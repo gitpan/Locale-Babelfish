@@ -12,7 +12,7 @@ use Locale::Babelfish::Maketext;
 use YAML::Tiny;
 use Carp qw/ confess /;
 
-our $VERSION = '0.03'; # VERSION
+our $VERSION = '0.04'; # VERSION
 
 our $EMPTY_VALUE = '_EMPTY_';
 
@@ -346,7 +346,7 @@ Locale::Babelfish - wrapper between Locale::Maketext::Lexicon and github://nodec
 
 =head1 VERSION
 
-version 0.03
+version 0.04
 
 =head1 SYNOPSIS
 
@@ -393,7 +393,7 @@ frontend.
 
 Constructor
 
-my $bf = Locale::Babelfish->new( {
+    my $bf = Locale::Babelfish->new( {
                             dirs => [ '/path/to/dictionaries' ], # is required
                             suffix => 'yaml', # dictionaries extension
                             default_lang => 'ru_RU', # by default en_US
