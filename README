@@ -1,34 +1,152 @@
-Locale-Babelfish version 0.01
-=============================
-Locale::Babelfish - wrapper between Locale::Maketext::Lexicon and Babelfish format
+NAME
+    Locale::Babelfish - wrapper between Locale::Maketext::Lexicon and
+    github://nodeca/babelfish format
 
-INSTALLATION
+VERSION
+    version 0.02
 
-To install this module type the following:
+SYNOPSIS
+        package Foo;
+        use Locale::Babelfish;
 
-   perl Makefile.PL
-   make
-   make test
-   make install
+        my $bf = Locale::Babelfish->new( { dirs => [ '/path/to/dictionaries' ] } );
+        print $bf->t('dictionary.firstkey.nextkey', { foo => 'bar' } );
 
-DEPENDENCIES
+    More sophisticated example:
 
-This module requires these other modules and libraries:
+        package Foo::Bar;
+        use Locale::Babelfish;
+        my $bf = Locale::Babelfish->new(
+            # configuration
+            {
+                dirs         => [ '/path/to/dictionaries' ],
+                default_lang => [ 'ru_RU' ], # By default en_US
+                langs        => [
+                    { 'uk_UA' => 'Foo::Bar::Lang::uk_UA' },
+                    'de_DE',
+                ], # for custom languages specify they are plural forms
+            },
+            # logger, for example Log::Log4Perl (not required parameter)
+            $logger
+        );
 
-  Locale::Maketext
-  Class::Accessor::Grouped
-  YAML::Tiny
-  Carp
-  Modern::Perl
+        # use default language
+        print $bf->t('dictionary.firstkey.nextkey', { foo => 'bar' } );
 
-COPYRIGHT AND LICENCE
+        # switch language
+        $bf->set_context_lang('en_US');
+        print $bf->t('dictionary.firstkey.nextkey', { foo => 'bar' } );
 
-Put the correct copyright and licence information here.
+DESCRIPTION
+    Internationalisation with easy syntax. Simple wrapper between
+    Locale::Maketext and <https://github.com/nodeca/babelfish> format.
+    Created for using same dictionaries on backend and frontend.
 
-Copyright (C) 2014 by Igor Mironov
+METHODS
+  new
+    Constructor. Locale::Babelfish->new( { dirs => [ '/path/to/dictionaries'
+    ], # is required suffix => 'yaml', # dictionaries extension default_lang
+    => 'ru_RU', # by default en_US langs => [ 'de_DE', 'fr_FR', 'uk_UA' =>
+    'Foo::Bar::Lang::uk_UA' ] }, $logger );
 
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.14.2 or,
-at your option, any later version of Perl 5 you may have available.
+  set_context_lang
+    Setting current context.
 
+        $self->set_context_lang( 'ru_RU' );
+
+  check_dictionaries
+    Check what changed at dictionaries. And renew dictionary content without
+    restart.
+
+        $self->check_dictionaries();
+
+  t
+    Get internationalized value for key from dictionary.
+
+        $self->t( 'main.key.subkey' , { param1 => 1 , param2 => { next_level  => 'test' } } );
+
+    Where "main" - is dictionary, "key.subkey" - key at dictionary.
+
+  has_any_value
+    Check exist or not key in dictionary.
+
+        $self->has_any_value( 'main.key.subkey' );
+
+    Where "main" - is dictionary, "key.subkey" - key at dictionary.
+
+  maketext
+    same as t, but parameters for substitute are sequential
+    $self->maketext( 'dict', 'key.subkey ' , $param1, ... $paramN );
+    Where "dict" - is dictionary, "key.subkey" - key at dictionary.
+DICTIONARIES
+  Phrases Syntax
+    #{varname} Echoes value of variable ((Singular|Plural1|Plural2)):count
+    Plural form
+
+    Example:
+
+        I have #{count} ((nail|nails)):count
+
+    or short form
+
+        I have #{count} ((nail|nails))
+
+  Dictionary file example
+    Module support only YAML format. Create dictionary file like:
+    dictionary.en_US.yaml where "dictionary" is name of dictionary and
+    "en_US" - its locale.
+
+        profile: Profiel
+            apps:
+                forums:
+                    new_topic: New topic
+                    last_post:
+                        title : Last message
+        demo:
+            apples: I have #{count} ((apple|apples))
+
+  Custom plural forms
+    By default locale will be inherited from "en_US". If you would like
+    specify own, create module like this and implement quant_word function.
+
+        package Locale::Babelfish::Lang::uk_UA;
+
+        use strict;
+        use parent 'Locale::Babelfish::Maketext';
+
+        sub quant_word {
+            my ($self, $num, $single, $plural1, $plural2) = @_;
+
+            my $num_s   = $num % 10;
+            my $num_dec = $num % 100;
+            my $ret;
+
+            if    ($num_dec >= 10 and $num_dec <= 20) { $ret = $plural2 || $plural1 || $single }
+            elsif ($num_s == 1)                       { $ret = $single }
+            elsif ($num_s >= 2 and $num_s <= 4)       { $ret = $plural1 || $single }
+            else                                      { $ret = $plural2 || $plural1 || $single }
+            return $ret;
+        }
+
+  Encoding
+    Use any convinient encoding. But better use utf8 with BOM.
+
+SEE ALSO
+    Locale::Maketext::Lexicon
+
+    <https://github.com/nodeca/babelfish>
+
+AUTHORS
+    *   Igor Mironov <grif@cpan.org>
+
+    *   Crazy Panda LLC
+
+    *   REG.RU LLC
+
+COPYRIGHT AND LICENSE
+    This software is Copyright (c) 2014 by Igor Mironov.
+
+    This is free software, licensed under:
+
+      The MIT (X11) License
 

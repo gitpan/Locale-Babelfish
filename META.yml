@@ -1,0 +1,66 @@
+---
+abstract: 'wrapper between Locale::Maketext::Lexicon and github://nodeca/babelfish format'
+author:
+  - 'Igor Mironov <grif@cpan.org>'
+  - 'Crazy Panda LLC'
+  - 'REG.RU LLC'
+build_requires:
+  File::Spec: 0
+  File::Temp: 0
+  FindBin: 0
+  IO::Handle: 0
+  IPC::Open3: 0
+  Test::Deep: 0
+  Test::More: 0.98
+  strict: 0
+  utf8: 0
+  warnings: 0
+configure_requires:
+  ExtUtils::MakeMaker: 6.30
+dynamic_config: 0
+generated_by: 'Dist::Zilla version 5.019, CPAN::Meta::Converter version 2.132140'
+license: mit
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: Locale-Babelfish
+no_index:
+  directory:
+    - t
+    - xt
+    - eg
+    - examples
+    - corpus
+  namespace:
+    - t::lib
+  package:
+    - DB
+provides:
+  Locale::Babelfish:
+    file: lib/Locale/Babelfish.pm
+    version: 0.02
+  Locale::Babelfish::Lang::en_US:
+    file: lib/Locale/Babelfish/Lang/en_US.pm
+    version: 0.02
+  Locale::Babelfish::Lang::ru_RU:
+    file: lib/Locale/Babelfish/Lang/ru_RU.pm
+    version: 0.02
+  Locale::Babelfish::Maketext:
+    file: lib/Locale/Babelfish/Maketext.pm
+    version: 0.02
+requires:
+  Carp: 0
+  Class::Accessor::Grouped: 0
+  Locale::Maketext: 0
+  Modern::Perl: 0
+  YAML::Tiny: 0
+  parent: 0
+  perl: 5.008009
+  strict: 0
+  utf8: 0
+  warnings: 0
+resources:
+  bugtracker: https://github.com/regru/Locale-Babelfish/issues
+  homepage: https://metacpan.org/release/Locale-Babelfish
+  repository: git://github.com/regru/Locale-Babelfish.git
+version: 0.02
