@@ -7,7 +7,7 @@ use Modern::Perl;
 use Carp;
 use parent 'Locale::Maketext';
 
-our $VERSION = '0.04'; # VERSION
+our $VERSION = '0.05'; # VERSION
 
 
 sub create_lh {
@@ -92,6 +92,7 @@ sub quant_word_std_single {
 
 sub quant_word_std_double {
     my ($self, $num, $single, $plural) = @_;
+    $num ||= 0;
     return $num == 1 ? $single : ($plural || $single);
 }
 
@@ -110,7 +111,7 @@ Locale::Babelfish::Maketext - Wrapper around Locale::Maketext
 
 =head1 VERSION
 
-version 0.04
+version 0.05
 
 =head1 METHODS
 

@@ -12,14 +12,14 @@ use Locale::Babelfish::Maketext;
 use YAML::Tiny;
 use Carp qw/ confess /;
 
-our $VERSION = '0.04'; # VERSION
+our $VERSION = '0.05'; # VERSION
 
 our $EMPTY_VALUE = '_EMPTY_';
 
 my ( $default_lang, $log, $lex, $dirs, $langs, $dictionaries, $default_dict, $suffix, %lhs, $lexicon_vars );
 my $avaible_langs = [qw /en_US ru_RU/ ];
 
-__PACKAGE__->mk_group_accessors( simple => qw/ context_lang / );
+__PACKAGE__->mk_group_accessors( simple => qw/ context_lang default_lang / );
 
 
 sub new {
@@ -51,6 +51,7 @@ sub new {
 
     my $self = bless {
         context_lang => $default_lang,
+        default_lang => $default_lang,
     }, $class;
 
     $self->check_dictionaries;
@@ -346,7 +347,7 @@ Locale::Babelfish - wrapper between Locale::Maketext::Lexicon and github://nodec
 
 =head1 VERSION
 
-version 0.04
+version 0.05
 
 =head1 SYNOPSIS
 
@@ -430,9 +431,11 @@ Where C<main> - is dictionary, C<key.subkey> - key at dictionary.
 
 =head2 maketext
 
-    same as t, but parameters for substitute are sequential
+same as t, but parameters for substitute are sequential
+
     $self->maketext( 'dict', 'key.subkey ' , $param1, ... $paramN );
-    Where C<dict> - is dictionary, C<key.subkey> - key at dictionary.
+
+Where C<dict> - is dictionary, C<key.subkey> - key at dictionary.
 
 =head1 DICTIONARIES
 
