@@ -12,14 +12,14 @@ use Locale::Babelfish::Maketext;
 use YAML::Tiny;
 use Carp qw/ confess /;
 
-our $VERSION = '0.05'; # VERSION
+our $VERSION = '0.06'; # VERSION
 
 our $EMPTY_VALUE = '_EMPTY_';
 
 my ( $default_lang, $log, $lex, $dirs, $langs, $dictionaries, $default_dict, $suffix, %lhs, $lexicon_vars );
 my $avaible_langs = [qw /en_US ru_RU/ ];
 
-__PACKAGE__->mk_group_accessors( simple => qw/ context_lang default_lang / );
+__PACKAGE__->mk_group_accessors( simple => qw/ current_locale default_lang / );
 
 
 sub new {
@@ -50,7 +50,7 @@ sub new {
     $suffix       = $cfg->{suffix} || 'yaml';
 
     my $self = bless {
-        context_lang => $default_lang,
+        current_locale => $default_lang,
         default_lang => $default_lang,
     }, $class;
 
@@ -60,9 +60,15 @@ sub new {
 }
 
 
+sub set_locale {
+    my ($self, $lang) = @_;
+    $self->{current_locale} = ($lang and exists $langs->{$lang}) ? $lang : $default_lang;
+}
+
+
 sub set_context_lang {
     my ($self, $lang) = @_;
-    $self->{context_lang} = ($lang and exists $langs->{$lang}) ? $lang : $default_lang;
+    $self->{current_locale} = ($lang and exists $langs->{$lang}) ? $lang : $default_lang;
 }
 
 
@@ -92,7 +98,7 @@ sub t {
     Carp::confess "wrong dictionary $dictname"  unless exists $dictionaries->{$dictname};
     Carp::confess "key missed"        unless $key;
 
-    my $lang = $self->{context_lang};
+    my $lang = $self->{current_locale};
     $lang = exists $langs->{$lang} ? $lang : $default_lang;
 
     my $flat_params = $self->_flat_hash_keys($params);
@@ -119,7 +125,7 @@ sub has_any_value {
 
 
     $dictname ||= $default_dict;
-    my $lang = $self->{context_lang};
+    my $lang = $self->{current_locale};
     $lang = exists $langs->{$lang} ? $lang : $default_lang;
 
     my $val;
@@ -201,7 +207,7 @@ sub _babelfish_converter {
 sub _localize_maketext  {
     my ($self, $dictname, $lang) = (shift, shift, shift);
     $dictname ||= $default_dict;
-    $lang ||= $self->{context_lang};
+    $lang ||= $self->{current_locale};
     $lang = exists $langs->{$lang} ? $lang : $default_lang;
 
     my $val;
@@ -347,7 +353,7 @@ Locale::Babelfish - wrapper between Locale::Maketext::Lexicon and github://nodec
 
 =head1 VERSION
 
-version 0.05
+version 0.06
 
 =head1 SYNOPSIS
 
@@ -379,8 +385,11 @@ More sophisticated example:
     print $bf->t('dictionary.firstkey.nextkey', { foo => 'bar' } );
 
     # switch language
-    $bf->set_context_lang('en_US');
+    $bf->set_locale('en_US');
     print $bf->t('dictionary.firstkey.nextkey', { foo => 'bar' } );
+
+    # Get current locale
+    print $bf->current_locale;
 
 =head1 DESCRIPTION
 
@@ -401,9 +410,15 @@ Constructor
                             langs => [ 'de_DE', 'fr_FR', 'uk_UA' => 'Foo::Bar::Lang::uk_UA' ]
                         }, $logger  );
 
+=head2 set_locale
+
+Setting current locale.
+
+    $self->set_locale( 'ru_RU' );
+
 =head2 set_context_lang
 
-Setting current context.
+depricated, please use set_locale
 
     $self->set_context_lang( 'ru_RU' );
 

@@ -82,19 +82,19 @@
    "provides" : {
       "Locale::Babelfish" : {
          "file" : "lib/Locale/Babelfish.pm",
-         "version" : "0.05"
+         "version" : "0.06"
       },
       "Locale::Babelfish::Lang::en_US" : {
          "file" : "lib/Locale/Babelfish/Lang/en_US.pm",
-         "version" : "0.05"
+         "version" : "0.06"
       },
       "Locale::Babelfish::Lang::ru_RU" : {
          "file" : "lib/Locale/Babelfish/Lang/ru_RU.pm",
-         "version" : "0.05"
+         "version" : "0.06"
       },
       "Locale::Babelfish::Maketext" : {
          "file" : "lib/Locale/Babelfish/Maketext.pm",
-         "version" : "0.05"
+         "version" : "0.06"
       }
    },
    "release_status" : "stable",
@@ -109,6 +109,6 @@
          "web" : "https://github.com/regru/Locale-Babelfish"
       }
    },
-   "version" : "0.05"
+   "version" : "0.06"
 }
 

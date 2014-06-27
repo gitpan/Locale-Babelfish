@@ -3,7 +3,7 @@ NAME
     github://nodeca/babelfish format
 
 VERSION
-    version 0.05
+    version 0.06
 
 SYNOPSIS
         package Foo;
@@ -34,8 +34,11 @@ SYNOPSIS
         print $bf->t('dictionary.firstkey.nextkey', { foo => 'bar' } );
 
         # switch language
-        $bf->set_context_lang('en_US');
+        $bf->set_locale('en_US');
         print $bf->t('dictionary.firstkey.nextkey', { foo => 'bar' } );
+
+        # Get current locale
+        print $bf->current_locale;
 
 DESCRIPTION
     Internationalisation with easy syntax. Simple wrapper between
@@ -53,8 +56,13 @@ METHODS
                                 langs => [ 'de_DE', 'fr_FR', 'uk_UA' => 'Foo::Bar::Lang::uk_UA' ]
                             }, $logger  );
 
+  set_locale
+    Setting current locale.
+
+        $self->set_locale( 'ru_RU' );
+
   set_context_lang
-    Setting current context.
+    depricated, please use set_locale
 
         $self->set_context_lang( 'ru_RU' );
 
