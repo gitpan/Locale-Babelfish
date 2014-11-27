@@ -4,15 +4,21 @@ use warnings;
 
 # this test was generated with Dist::Zilla::Plugin::Test::Compile 2.041
 
-use Test::More  tests => 4 + ($ENV{AUTHOR_TESTING} ? 1 : 0);
+use Test::More  tests => 10 + ($ENV{AUTHOR_TESTING} ? 1 : 0);
 
 
 
 my @module_files = (
     'Locale/Babelfish.pm',
-    'Locale/Babelfish/Lang/en_US.pm',
-    'Locale/Babelfish/Lang/ru_RU.pm',
-    'Locale/Babelfish/Maketext.pm'
+    'Locale/Babelfish/Phrase/Compiler.pm',
+    'Locale/Babelfish/Phrase/Literal.pm',
+    'Locale/Babelfish/Phrase/Node.pm',
+    'Locale/Babelfish/Phrase/Parser.pm',
+    'Locale/Babelfish/Phrase/ParserBase.pm',
+    'Locale/Babelfish/Phrase/PluralForms.pm',
+    'Locale/Babelfish/Phrase/PluralFormsParser.pm',
+    'Locale/Babelfish/Phrase/Pluralizer.pm',
+    'Locale/Babelfish/Phrase/Variable.pm'
 );
 
 

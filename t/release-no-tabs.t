@@ -16,9 +16,15 @@ use Test::NoTabs;
 
 my @files = (
     'lib/Locale/Babelfish.pm',
-    'lib/Locale/Babelfish/Lang/en_US.pm',
-    'lib/Locale/Babelfish/Lang/ru_RU.pm',
-    'lib/Locale/Babelfish/Maketext.pm',
+    'lib/Locale/Babelfish/Phrase/Compiler.pm',
+    'lib/Locale/Babelfish/Phrase/Literal.pm',
+    'lib/Locale/Babelfish/Phrase/Node.pm',
+    'lib/Locale/Babelfish/Phrase/Parser.pm',
+    'lib/Locale/Babelfish/Phrase/ParserBase.pm',
+    'lib/Locale/Babelfish/Phrase/PluralForms.pm',
+    'lib/Locale/Babelfish/Phrase/PluralFormsParser.pm',
+    'lib/Locale/Babelfish/Phrase/Pluralizer.pm',
+    'lib/Locale/Babelfish/Phrase/Variable.pm',
     't/00-compile.t',
     't/00-report-prereqs.t',
     't/01-basic.t',

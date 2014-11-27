@@ -1,8 +1,8 @@
 ---
-abstract: 'wrapper between Locale::Maketext::Lexicon and github://nodeca/babelfish format'
+abstract: 'Perl I18n using github://nodeca/babelfish format.'
 author:
+  - 'Akzhan Abdulin <akzhan@cpan.org>'
   - 'Igor Mironov <grif@cpan.org>'
-  - 'Crazy Panda LLC'
   - 'REG.RU LLC'
 build_requires:
   File::Spec: 0
@@ -18,7 +18,7 @@ build_requires:
 configure_requires:
   ExtUtils::MakeMaker: 6.30
 dynamic_config: 0
-generated_by: 'Dist::Zilla version 5.019, CPAN::Meta::Converter version 2.132140'
+generated_by: 'Dist::Zilla version 5.019, CPAN::Meta::Converter version 2.142060'
 license: mit
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -38,24 +38,44 @@ no_index:
 provides:
   Locale::Babelfish:
     file: lib/Locale/Babelfish.pm
-    version: 0.06
-  Locale::Babelfish::Lang::en_US:
-    file: lib/Locale/Babelfish/Lang/en_US.pm
-    version: 0.06
-  Locale::Babelfish::Lang::ru_RU:
-    file: lib/Locale/Babelfish/Lang/ru_RU.pm
-    version: 0.06
-  Locale::Babelfish::Maketext:
-    file: lib/Locale/Babelfish/Maketext.pm
-    version: 0.06
+    version: 1.000000
+  Locale::Babelfish::Phrase::Compiler:
+    file: lib/Locale/Babelfish/Phrase/Compiler.pm
+    version: 1.000000
+  Locale::Babelfish::Phrase::Literal:
+    file: lib/Locale/Babelfish/Phrase/Literal.pm
+    version: 1.000000
+  Locale::Babelfish::Phrase::Node:
+    file: lib/Locale/Babelfish/Phrase/Node.pm
+    version: 1.000000
+  Locale::Babelfish::Phrase::Parser:
+    file: lib/Locale/Babelfish/Phrase/Parser.pm
+    version: 1.000000
+  Locale::Babelfish::Phrase::ParserBase:
+    file: lib/Locale/Babelfish/Phrase/ParserBase.pm
+    version: 1.000000
+  Locale::Babelfish::Phrase::PluralForms:
+    file: lib/Locale/Babelfish/Phrase/PluralForms.pm
+    version: 1.000000
+  Locale::Babelfish::Phrase::PluralFormsParser:
+    file: lib/Locale/Babelfish/Phrase/PluralFormsParser.pm
+    version: 1.000000
+  Locale::Babelfish::Phrase::Pluralizer:
+    file: lib/Locale/Babelfish/Phrase/Pluralizer.pm
+    version: 1.000000
+  Locale::Babelfish::Phrase::Variable:
+    file: lib/Locale/Babelfish/Phrase/Variable.pm
+    version: 1.000000
 requires:
   Carp: 0
-  Class::Accessor::Grouped: 0
-  Locale::Maketext: 0
-  Modern::Perl: 0
-  YAML::Tiny: 0
+  Class::Accessor::Fast: 0
+  File::Find: 0
+  File::Spec: 0
+  List::Util: 1.33
+  Scalar::Util: 0
+  YAML::Syck: 0
   parent: 0
-  perl: 5.008009
+  perl: 5.010001
   strict: 0
   utf8: 0
   warnings: 0
@@ -63,4 +83,4 @@ resources:
   bugtracker: https://github.com/regru/Locale-Babelfish/issues
   homepage: https://metacpan.org/release/Locale-Babelfish
   repository: git://github.com/regru/Locale-Babelfish.git
-version: 0.06
+version: 1.000000

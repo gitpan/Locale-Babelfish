@@ -1,341 +1,280 @@
 package Locale::Babelfish;
 
-# ABSTRACT: wrapper between Locale::Maketext::Lexicon and github://nodeca/babelfish format
+# ABSTRACT: Perl I18n using github://nodeca/babelfish format.
 
 
 use utf8;
-use Modern::Perl;
+use strict;
+use warnings;
 
-use parent 'Class::Accessor::Grouped';
-
-use Locale::Babelfish::Maketext;
-use YAML::Tiny;
 use Carp qw/ confess /;
+use File::Find qw( find );
+use File::Spec ();
+use List::Util qw( first );
+use YAML::Syck qw( LoadFile );
 
-our $VERSION = '0.06'; # VERSION
+use Locale::Babelfish::Phrase::Parser ();
+use Locale::Babelfish::Phrase::Compiler ();
 
-our $EMPTY_VALUE = '_EMPTY_';
+use parent qw( Class::Accessor::Fast );
 
-my ( $default_lang, $log, $lex, $dirs, $langs, $dictionaries, $default_dict, $suffix, %lhs, $lexicon_vars );
-my $avaible_langs = [qw /en_US ru_RU/ ];
+our $VERSION = '1.000000'; # VERSION
 
-__PACKAGE__->mk_group_accessors( simple => qw/ current_locale default_lang / );
+__PACKAGE__->mk_accessors( qw(
+    dictionaries
+    fallbacks
+    fallback_cache
+    dirs
+    _suffix
+    default_locale
+    file_filter
+) );
+
+my $parser = Locale::Babelfish::Phrase::Parser->new();
+my $compiler = Locale::Babelfish::Phrase::Compiler->new();
 
 
 sub new {
-    my ($class, $cfg, $logger) = @_;
-
-    $log          = $logger;
-    $default_lang = $cfg->{default_lang} || 'en_US';
-    my $c_dicts   = $cfg->{dictionaries};
-    my $c_langs   = $cfg->{langs};
-    my $c_dirs    = $cfg->{dirs};
-
-    confess 'dirs are missed' unless $c_dirs;
-
-    $dictionaries = { map {$_ => 1} @{$c_dicts} };
-    $default_dict = $c_dicts->[0];
-    push @$c_langs ,@$avaible_langs;
-    for my $lang ( @{$c_langs} ) {
-        if ( ref $lang eq 'HASH'){
-            my @keys = keys %{$lang};
-            $langs->{$keys[0]} = $lang->{$keys[0]};
-        }
-        else {
-            $langs->{$lang} = 'ok';
-        }
-    }
-
-    $dirs         = [ map {$_ . ''} @{$c_dirs} ];
-    $suffix       = $cfg->{suffix} || 'yaml';
-
+    my ( $class, $cfg ) = @_;
+    $cfg //= {};
     my $self = bless {
-        current_locale => $default_lang,
-        default_lang => $default_lang,
+        dictionaries   => {},
+        dirs           => [ "./locales" ],
+        fallbacks      => {},
+        fallback_cache => {},
+        _suffix        => $cfg->{suffix} // 'yaml',
+        default_locale => $cfg->{default_locale} // 'en_US',
+        %{ $cfg },
     }, $class;
 
-    $self->check_dictionaries;
+    $self->load_dictionaries( $self->file_filter );
+    $self->locale( $self->{default_locale} );
 
     return $self;
 }
 
 
-sub set_locale {
-    my ($self, $lang) = @_;
-    $self->{current_locale} = ($lang and exists $langs->{$lang}) ? $lang : $default_lang;
-}
-
-
-sub set_context_lang {
-    my ($self, $lang) = @_;
-    $self->{current_locale} = ($lang and exists $langs->{$lang}) ? $lang : $default_lang;
-}
-
-
-sub check_dictionaries {
+sub locale {
     my $self = shift;
+    return $self->{locale}  if scalar(@_) == 0;
+    $self->{locale} = $self->detect_locale( $_[0] );
+}
 
-    state $dict_files = [];
 
-    my $files = $self->_get_files;
-    while (my ($dictname, $data) = each %$files) {
-        #next unless exists $dictionaries->{$dictname};
-        $dictionaries->{$dictname} = 1;
-        push @$dict_files, values %{$data->{langs}};
+sub prepare_to_compile {
+    my ( $self ) = @_;
+    while ( my ($locale, $dic) = each(%{ $self->{dictionaries} }) ) {
+        while ( my ($key, $value) = each(%$dic) ) {
+            if ( $self->phrase_need_compilation( $value, $key ) ) {
+                $dic->{$key} = \$value; # lazy compile
+                #$dic->{$key} = $compiler->compile( $parser->parse($value, $locale) );
+            }
+        }
+    }
+    return 1;
+}
+
+
+sub detect_locale {
+    my ( $self, $locale ) = @_;
+    return $locale  if $self->dictionaries->{$locale};
+    my $alt_locale = first { $_ =~ m/\A\Q$locale\E[\-_]/i } keys %{ $self->dictionaries };
+    if ( $alt_locale && $self->dictionaries->{$alt_locale} ) {
+        # Lets locale dictionary will refer to alt locale dictinary.
+        # This speeds up all subsequent calls of t/detect/exists on this locale.
+        $self->dictionaries->{$locale} = $self->dictionaries->{$alt_locale};
+
+        $self->fallback_cache->{$locale} = $self->fallback_cache->{$alt_locale}
+            if exists $self->fallback_cache->{$alt_locale};
+
+        $self->fallbacks->{$locale} = $self->fallbacks->{$alt_locale}
+            if exists $self->fallbacks->{$alt_locale};
+
+        return $locale;
+    }
+    return $self->{default_locale}  if $self->dictionaries->{ $self->{default_locale} };
+    confess "bad locale: $locale and bad default_locale: $self->{default_locale}.";
+}
+
+
+sub load_dictionaries {
+    my ( $self, $filter ) = @_;
+
+    for my $dir ( @{$self->dirs} ) {
+        find( {
+            follow   => 1,
+            no_chdir => 1,
+            wanted   => sub {
+                my $file = File::Spec->rel2abs( $File::Find::name );
+                return  unless -f $file;
+                my ( $volume, $directories, $base ) = File::Spec->splitpath( $file );
+
+                return  if $filter && !$filter->($file);
+
+                my @tmp = split m/\./, $base;
+
+                my $cur_suffix = pop @tmp;
+                return  if $cur_suffix ne $self->_suffix;
+                my $locale = pop @tmp;
+
+                my $dictname = join('.', @tmp);
+                my $subdir = File::Spec->catpath( $volume, $directories, '' );
+                my $fdir = File::Spec->rel2abs( $dir );
+                if ( $subdir =~ m/\A\Q$fdir\E[\\\/](.+)\z/) {
+                    $dictname = "$1$dictname";
+                }
+
+                $self->_load_dictionary( $dictname, $locale, $file );
+            },
+        }, $dir );
+    }
+    $self->prepare_to_compile;
+}
+
+
+sub _load_dictionary {
+    my ( $self, $dictname, $lang, $file ) = @_;
+
+    $self->dictionaries->{$lang} //= {};
+
+    local $YAML::Syck::ImplicitUnicode = 1;
+    my $yaml = LoadFile( $file );
+
+    _flat_hash_keys( $yaml, "$dictname.", $self->dictionaries->{$lang} );
+}
+
+
+sub phrase_need_compilation {
+    my ( undef, $phrase, $key ) = @_;
+    die "L10N: $key is undef"  unless defined $phrase;
+    return 1
+        && ref($phrase) eq ''
+        && $phrase =~ m/ (?: \(\( | \#\{ | \\\\ )/x
+        ;
+}
+
+
+sub t_or_undef {
+    my ( $self, $dictname_key, $params, $custom_locale ) = @_;
+
+    # disallow non-ASCII keys
+    confess("wrong dictname_key: $dictname_key")  if $dictname_key =~ m/\P{ASCII}/;
+
+    my $locale = $custom_locale ? $self->detect_locale( $custom_locale ) : $self->{locale};
+
+    my $r = $self->{dictionaries}->{$locale}->{$dictname_key};
+
+    if ( defined $r ) {
+        if ( ref( $r ) eq 'SCALAR' ) {
+            $self->{dictionaries}->{$locale}->{$dictname_key} = $r = $compiler->compile(
+                $parser->parse( $$r, $locale ),
+            );
+        }
+    }
+     # fallbacks
+    else {
+        $self->{fallback_cache}->{$locale} //= {};
+        #  Cache can contain undef, as unexistent value.
+        if ( exists $self->{fallback_cache}->{$locale}->{$dictname_key} ) {
+            $r = $self->{fallback_cache}->{$locale}->{$dictname_key};
+        }
+        else {
+            my @fallback_locales = @{ $self->{fallbacks}->{$locale} // [] };
+            for ( @fallback_locales ) {
+                $r = $self->{dictionaries}->{$_}->{$dictname_key};
+                if ( defined $r ) {
+                    if ( ref( $r ) eq 'SCALAR' ) {
+                        $self->{dictionaries}->{$_}->{$dictname_key} = $r = $compiler->compile(
+                            $parser->parse( $$r, $_ ),
+                        );
+                    }
+                    last;
+                }
+            }
+            $self->{fallback_cache}->{$locale}->{$dictname_key} = $r;
+        }
     }
 
-    map {
-        $self->_load_file($_->{dict}, $_->{lang}, $_->{file});
-    } @$dict_files;
+    if ( ref( $r ) eq 'CODE' ) {
+        my $flat_params = {};
+        # Convert parameters hash to flat form like "key.subkey"
+        if ( defined($params) ) {
+            # Scalar interpreted as { count => $scalar, value => $scalar }.
+            if ( ref($params) eq '' ) {
+                $flat_params = {
+                    count => $params,
+                    value => $params,
+                };
+            }
+            else {
+                _flat_hash_keys( $params, '', $flat_params );
+            }
+        }
 
+        return $r->( $flat_params );
+    }
+    return $r;
 }
 
 
 sub t {
-    my ($self, $dictname_key , $params ) = ( shift, shift, shift );
+    my $self = shift;
 
-    my ( $dictname, $key ) = $self->_parse_dictname_key( $dictname_key );
-    Carp::confess "wrong dictionary $dictname"  unless exists $dictionaries->{$dictname};
-    Carp::confess "key missed"        unless $key;
-
-    my $lang = $self->{current_locale};
-    $lang = exists $langs->{$lang} ? $lang : $default_lang;
-
-    my $flat_params = $self->_flat_hash_keys($params);
-
-    my @params;
-
-    for my $k ( keys %$flat_params ) {
-        next unless exists $lexicon_vars->{$dictname}->{$lang}->{$key}->{$k};
-        my $positon_in_array =  $lexicon_vars->{$dictname}->{$lang}->{$key}->{$k} - 1;
-        $params[$positon_in_array] = $flat_params->{$k} if $positon_in_array >= 0;
-    }
-
-    return $self->_localize_maketext($dictname, undef, $key, @params);
+    return $self->t_or_undef( @_ ) || "[$_[0]]";
 }
 
 
 sub has_any_value {
+    my ( $self, $dictname_key, $custom_locale ) = @_;
 
-    my ( $self, $dictname_key ) = ( shift, shift );
+    # disallow non-ASCII keys
+    confess("wrong dictname_key: $dictname_key")  if $dictname_key =~ m/\P{ASCII}/;
 
-    my ( $dictname, $key ) = $self->_parse_dictname_key( $dictname_key );
-    Carp::confess "wrong dictionary"  unless exists $dictionaries->{$dictname};
-    Carp::confess "key missed"        unless $key;
+    my $locale = $custom_locale ? $self->detect_locale( $custom_locale ) : $self->{locale};
 
+    return 1  if $self->{dictionaries}->{$locale}->{$dictname_key};
 
-    $dictname ||= $default_dict;
-    my $lang = $self->{current_locale};
-    $lang = exists $langs->{$lang} ? $lang : $default_lang;
+    $self->{fallback_cache}->{$locale} //= {};
+    return ( ( defined $self->{fallback_cache}->{$locale}->{$dictname_key} ) ? 1 : 0 )
+        if exists $self->{fallback_cache}->{$locale}->{$dictname_key};
 
-    my $val;
-    if (my $lh = $lhs{$dictname}{$lang}) {
-        $val = $lh->lexicon->{$key};
-        $val = undef if $val and $val eq $EMPTY_VALUE;
+    my @fallback_locales = @{ $self->{fallbacks}->{$locale} // [] };
+    for ( @fallback_locales ) {
+        return 1  if defined $self->{dictionaries}->{$_}->{$dictname_key};
     }
 
-    if (!$val and $default_lang ne $lang and my $dlh = $lhs{$dictname}{$default_lang}) {
-        $val = $dlh->lexicon->{$key};
-        $val = undef if $val and $val eq $EMPTY_VALUE;
-    }
-
-    return $val ? 1 : 0;
+    return 0;
 }
 
 
+sub set_fallback {
+    my ( $self, $locale, @fallback_locales ) = @_;
+    return  unless scalar( @fallback_locales );
 
-sub maketext  {shift->_localize_maketext(shift, undef, @_)}
+    $locale = $self->detect_locale( $locale );
 
+    @fallback_locales = @{ $fallback_locales[0] }  if 1
+        && scalar( @fallback_locales ) == 1
+        && ref( $fallback_locales[0] ) eq 'ARRAY'
+        ;
 
-sub _babelfish_converter {
-    my ( $self , $data_yaml ) = @_;
+    $self->fallbacks->{ $locale } = \@fallback_locales;
+    delete $self->{fallback_cache}->{ $locale };
 
-    my $data;
-    my $vars;
-
-    foreach my $key (keys %$data_yaml) {
-        my $content = $data_yaml->{$key};
-
-        my ( @single_vars ) = $content =~ m{\#\{(.+?)\}}xmsig;
-
-        push @single_vars, 'count';
-
-        my ( @plural_vars ) = $content =~ m{\(\(.+?\)\)(?=\:(.+?)\b)?}xmsig;
-
-        my $i = 1;
-
-        my $numered_vars;
-        for my $key ( @single_vars, @plural_vars )  {
-            next if  !$key || exists $numered_vars->{$key} ;
-            $numered_vars->{$key} = $i;
-            $i++;
-        }
-
-        my ( @plurals ) = $content =~ m{(\(\(.+?\)\))(?=\:(.+?)\b)?}xmsig;
-
-        for ( $i = 0; $i < @plurals; $i +=2 ) {
-            my $construction = $plurals[$i];
-            next unless $construction;
-            my $var = $plurals[$i+1] || 'count';
-            my ( $plural_list ) = $construction =~ m{\(\((.+?)\)\)}xmsig;
-            my $orig_list =  $plural_list;
-
-            $orig_list =~ s {\|}{\\\|}xmsig;
-
-            $plural_list =~ s{\|}{\,}xmsig;
-
-            my $locale_text_string = "[numb,_" . $numered_vars->{$var} . ",$plural_list]";
-            $content =~ s{\(\($orig_list\)\)(?:\:$var\b)}{$locale_text_string}xmsig;
-
-            my $short_form = "[numb,_" . $numered_vars->{count} . ",$plural_list]";
-            $content =~ s{\(\($orig_list\)\)(?!\:)}{$short_form}xmsig;
-        }
-
-        foreach my $var ( keys %$numered_vars ) {
-            my $numb = $numered_vars->{$var};
-            $content =~ s{\#\{$var\}}{\[_$numb\]}xmsig;
-        }
-
-        $data->{$key} = $content;
-        $vars->{$key} = $numered_vars;
-    }
-    return ( $data , $vars );
-
-}
-
-
-sub _localize_maketext  {
-    my ($self, $dictname, $lang) = (shift, shift, shift);
-    $dictname ||= $default_dict;
-    $lang ||= $self->{current_locale};
-    $lang = exists $langs->{$lang} ? $lang : $default_lang;
-
-    my $val;
-    eval {
-        if (my $lh = $lhs{$dictname}{$lang}) {
-            $val = $lh->maketext(@_);
-            $val = undef if $val and $val eq $EMPTY_VALUE;
-        }
-        if (!$val and $default_lang ne $lang and my $dlh = $lhs{$dictname}{$default_lang}) {
-            $val = $dlh->maketext(@_);
-            $val = undef if $val and $val eq $EMPTY_VALUE;
-        }
-    };
-
-    $log->debug("Babelfish: maketext error: $@") if ( $log && $@ );
-
-    return $val || "[Babelfish:$_[0]]";
+    return 1;
 }
 
 
 sub _flat_hash_keys {
-    my $self  = shift;
-    my $hash  = shift;
-    my $ln    = shift || '';
-    my $store = shift || {};
-    return  if ref($hash) ne 'HASH';
-    for my $key ( keys %{$hash} ) {
-        if (ref($hash->{$key}) eq 'HASH') {
-            my $bc = $ln;
-            $ln  .=  ($ln) ? ".$key" : $key;
-            $store = $self->_flat_hash_keys( $hash->{$key}, $ln, $store );
-            $ln = $bc;
+    my ( $hash, $prefix, $store ) = @_;
+    while ( my ($key, $value) = each(%$hash) ) {
+        if (ref($value) eq 'HASH') {
+            _flat_hash_keys( $value, "$prefix$key.", $store );
         } else {
-            my $ln1  =  ($ln) ? "$ln.$key" : $ln.$key;
-            $store->{$ln1} = $hash->{$key};
+            $store->{"$prefix$key"} = $value;
         }
     }
-    return $store;
-}
-
-
-sub _get_files {
-    my $self = shift;
-    my %files;
-    foreach my $dir (@$dirs) {
-        my $ok = opendir(my $dh, $dir);
-        unless ($ok) {
-            $log->debug("Cannot open dir $dir: $!") if ( $log );
-            next;
-        }
-        while (my $entry = readdir $dh) {
-            next if $entry eq '.' or $entry eq '..';
-            next unless rindex($entry, $suffix) == length($entry) - length($suffix);
-            my $file = "$dir/$entry";
-            my @tmp = split '\.', $entry;
-            my $cur_suffix = pop @tmp;
-            my $lang = pop @tmp;
-            my $dictname = join('.', @tmp);
-            next unless $cur_suffix eq $suffix;
-
-            my $row = $files{$dictname} ||= {dict => $dictname, langs => {}};
-            $row->{langs}{$lang} = {dict => $dictname, file => $file, lang => $lang};
-        }
-        closedir $dh;
-    }
-    return \%files;
-}
-
-
-sub _load_file {
-    my ( $self, $dictname, $lang, $file, $forced_read ) = @_;
-    $forced_read //= 0;
-    $file //= _file($dictname, $lang);
-
-    state $last_mtimes = {};
-    my $last_mtime = $last_mtimes->{$file};
-
-    return $lex->{$dictname}{$lang} if ($last_mtime and $last_mtime == (stat $file)[9]) && !$forced_read;
-    $last_mtimes->{$file} = (stat $file)[9];
-
-
-    my $content;
-
-    eval {
-        $content = YAML::Tiny->new->read( $file )
-    };
-
-    $log->debug("BabelFish: cannot parse file $file: $@") if ( $log && $@ );
-
-    my $data_yaml = $self->_flat_hash_keys($content->[0]) || {} ;
-
-    my ( $data , $vars ) = $self->_babelfish_converter($data_yaml);
-
-    if (exists $dictionaries->{$dictname}) {
-        my $lh = $lhs{$dictname}{$lang};
-        unless ($lh) {
-            my $parent = $langs->{$lang} eq 'ok' ? '' : $langs->{$lang};
-            $lh = $lhs{$dictname}{$lang} = Locale::Babelfish::Maketext->create_lh( $dictname, $lang, $data, $parent );
-        }
-        else {
-            $lh->set_lexicon($data);
-        }
-    }
-
-    $lex   ||= {};
-
-
-    $lexicon_vars->{$dictname}->{$lang} = $vars || {};
-    return $lex->{$dictname}{$lang} = $data;
-
-}
-
-
-sub _file {
-    foreach my $dir (@$dirs) {
-        my $fname = "$dir/$_[0].$_[1].$suffix";
-        return $fname if -e $fname;
-    }
-    return;
-}
-
-
-sub _parse_dictname_key {
-    my ($self, $dictname_key) = @_;
-
-    my ( $dictname, $key ) = $dictname_key =~ m{\A(.+?)\.(.+?)\z}xmsig;
-
-    return ( $dictname, $key );
+    return 1;
 }
 
 
@@ -349,15 +288,16 @@ __END__
 
 =head1 NAME
 
-Locale::Babelfish - wrapper between Locale::Maketext::Lexicon and github://nodeca/babelfish format
+Locale::Babelfish - Perl I18n using github://nodeca/babelfish format.
 
 =head1 VERSION
 
-version 0.06
+version 1.000000
 
 =head1 SYNOPSIS
 
     package Foo;
+
     use Locale::Babelfish;
 
     my $bf = Locale::Babelfish->new( { dirs => [ '/path/to/dictionaries' ] } );
@@ -366,36 +306,39 @@ version 0.06
 More sophisticated example:
 
     package Foo::Bar;
+
     use Locale::Babelfish;
-    my $bf = Locale::Babelfish->new(
+
+    my $bf = Locale::Babelfish->new( {
         # configuration
-        {
-            dirs         => [ '/path/to/dictionaries' ],
-            default_lang => [ 'ru_RU' ], # By default en_US
-            langs        => [
-                { 'uk_UA' => 'Foo::Bar::Lang::uk_UA' },
-                'de_DE',
-            ], # for custom languages specify they are plural forms
-        },
-        # logger, for example Log::Log4Perl (not required parameter)
-        $logger
-    );
+        dirs         => [ '/path/to/dictionaries' ],
+        default_locale => [ 'ru_RU' ], # By default en_US
+    } );
 
-    # use default language
-    print $bf->t('dictionary.firstkey.nextkey', { foo => 'bar' } );
+    # using default locale
+    print $bf->t( 'dictionary.akey' );
+    print $bf->t( 'dictionary.firstkey.nextkey', { foo => 'bar' } );
 
-    # switch language
-    $bf->set_locale('en_US');
-    print $bf->t('dictionary.firstkey.nextkey', { foo => 'bar' } );
+    # using specified locale
+    print $bf->t( 'dictionary.firstkey.nextkey', { foo => 'bar' }, 'by_BY' );
+
+    # using scalar as count or value variable
+    print $bf->t( 'dictionary.firstkey.nextkey', 90 );
+    # same as
+    print $bf->t( 'dictionary.firstkey.nextkey', { count => 90, value => 90 } );
+
+    # set locale
+    $bf->locale( 'en_US' );
+    print $bf->t( 'dictionary.firstkey.nextkey', { foo => 'bar' } );
 
     # Get current locale
-    print $bf->current_locale;
+    print $bf->locale;
 
 =head1 DESCRIPTION
 
-Internationalisation with easy syntax. Simple wrapper between L<Locale::Maketext> and
-L<https://github.com/nodeca/babelfish> format. Created for using same dictionaries on backend and
-frontend.
+Internationalisation with easy syntax
+
+Created for using same dictionaries on Perl and JavaScript.
 
 =head1 METHODS
 
@@ -404,37 +347,70 @@ frontend.
 Constructor
 
     my $bf = Locale::Babelfish->new( {
-                            dirs => [ '/path/to/dictionaries' ], # is required
-                            suffix => 'yaml', # dictionaries extension
-                            default_lang => 'ru_RU', # by default en_US
-                            langs => [ 'de_DE', 'fr_FR', 'uk_UA' => 'Foo::Bar::Lang::uk_UA' ]
-                        }, $logger  );
+        dirs           => [ '/path/to/dictionaries' ], # is required
+        suffix         => 'yaml', # dictionaries extension
+        default_locale => 'ru_RU', # by default en_US
+    } );
 
-=head2 set_locale
+=head2 locale
 
-Setting current locale.
+Gets or sets current locale.
 
-    $self->set_locale( 'ru_RU' );
+    $self->locale;
+    $self->locale( 'en_GB' );
 
-=head2 set_context_lang
+=head2 prepare_to_compile
 
-depricated, please use set_locale
+    $self->prepare_to_compile()
 
-    $self->set_context_lang( 'ru_RU' );
+Marks dictionary values as refscalars, is they need compilation.
+Or simply compiles them.
 
-=head2 check_dictionaries
+=head2 detect_locale
 
-Check what changed at dictionaries. And renew dictionary content without restart.
+    $self->detect_locale( $locale );
 
-    $self->check_dictionaries();
+Detects locale by specified locale/language.
+
+Returns default locale unless detected.
+
+=head2 load_dictionaries
+
+Loads dictionaries recursively on specified path.
+
+    $self->load_dictionaries;
+    $self->load_dictionaries( \&filter( $file_path ) );
+
+=head2 phrase_need_compilation
+
+    $self->phrase_need_compilation( $phrase, $key )
+    $class->phrase_need_compilation( $phrase, $key )
+
+Is phrase need parsing and compilation.
+
+=head2 t_or_undef
+
+Get internationalized value for key from dictionary.
+
+    $self->t_or_undef( 'main.key.subkey' );
+    $self->t_or_undef( 'main.key.subkey' , { param1 => 1 , param2 => { next_level  => 'test' } } );
+    $self->t_or_undef( 'main.key.subkey' , { param1 => 1 }, $specific_locale );
+    $self->t_or_undef( 'main.key.subkey' , 1 );
+
+Where C<main> - is dictionary, C<key.subkey> - key at dictionary.
 
 =head2 t
 
 Get internationalized value for key from dictionary.
 
+    $self->t( 'main.key.subkey' );
     $self->t( 'main.key.subkey' , { param1 => 1 , param2 => { next_level  => 'test' } } );
+    $self->t( 'main.key.subkey' , { param1 => 1 }, $specific_locale );
+    $self->t( 'main.key.subkey' , 1 );
 
 Where C<main> - is dictionary, C<key.subkey> - key at dictionary.
+
+Returns square bracketed key when value not found.
 
 =head2 has_any_value
 
@@ -444,35 +420,44 @@ Check exist or not key in dictionary.
 
 Where C<main> - is dictionary, C<key.subkey> - key at dictionary.
 
-=head2 maketext
+=head2 set_fallback
 
-same as t, but parameters for substitute are sequential
+    $self->set_fallback( 'by_BY', 'ru_RU', 'en_US');
+    $self->set_fallback( 'by_BY', [ 'ru_RU', 'en_US' ] );
 
-    $self->maketext( 'dict', 'key.subkey ' , $param1, ... $paramN );
+Set fallbacks for given locale.
 
-Where C<dict> - is dictionary, C<key.subkey> - key at dictionary.
+When `locale` has no translation for the phrase, fallbacks[0] will be
+tried, if translation still not found, then fallbacks[1] will be tried
+and so on. If none of fallbacks have translation,
+default locale will be tried as last resort.
 
 =head1 DICTIONARIES
 
 =head2 Phrases Syntax
 
 #{varname} Echoes value of variable
-((Singular|Plural1|Plural2)):count Plural form
+((Singular|Plural1|Plural2)):variable Plural form
+((Singular|Plural1|Plural2)) Short plural form for "count" variable
 
 Example:
 
-    I have #{count} ((nail|nails)):count
+    I have #{nails_count} ((nail|nails)):nails_count
 
 or short form
 
     I have #{count} ((nail|nails))
+
+or with zero and onу plural forms:
+
+    I have ((=0 no nails|=1 a nail|#{nails_count} nail|#{nails_count} nails)):nails_count
 
 =head2 Dictionary file example
 
 Module support only YAML format. Create dictionary file like: B<dictionary.en_US.yaml> where
 C<dictionary> is name of dictionary and C<en_US> - its locale.
 
-    profile: Profiel
+    profile:
         apps:
             forums:
                 new_topic: New topic
@@ -481,51 +466,30 @@ C<dictionary> is name of dictionary and C<en_US> - its locale.
     demo:
         apples: I have #{count} ((apple|apples))
 
-=head2 Custom plural forms
-
-By default locale will be inherited from C<en_US>. If you would like specify own, create module like
-this and implement B<quant_word> function.
-
-    package Locale::Babelfish::Lang::uk_UA;
-
-    use strict;
-    use parent 'Locale::Babelfish::Maketext';
-
-    sub quant_word {
-        my ($self, $num, $single, $plural1, $plural2) = @_;
-
-        my $num_s   = $num % 10;
-        my $num_dec = $num % 100;
-        my $ret;
-
-        if    ($num_dec >= 10 and $num_dec <= 20) { $ret = $plural2 || $plural1 || $single }
-        elsif ($num_s == 1)                       { $ret = $single }
-        elsif ($num_s >= 2 and $num_s <= 4)       { $ret = $plural1 || $single }
-        else                                      { $ret = $plural2 || $plural1 || $single }
-        return $ret;
-    }
-
 =head2 Encoding
 
-Use any convinient encoding. But better use utf8 with BOM.
+UTF-8 (Perl internal encoding).
 
-=for Pod::Coverage _babelfish_converter
+=head2 DETAILS
 
-=for Pod::Coverage _localize_maketext
+Dictionaries loaded at instance construction stage.
+
+All scalar values will be saved as scalar refs if needs compilation
+(has Babelfish control sequences).
+
+t_or_undef method translates specified key value.
+
+Result will be compiled when scalarref. Result of compilation is scalar or coderef.
+
+Result will be executed when coderef.
+
+Scalar/hashref/arrayref will be returned as is.
+
+=for Pod::Coverage _load_dictionary
 
 =for Pod::Coverage _flat_hash_keys
 
-=for Pod::Coverage _get_files
-
-=for Pod::Coverage _load_file
-
-=for Pod::Coverage _file
-
-=for Pod::Coverage _parse_dictname_key
-
 =head1 SEE ALSO
-
-L<Locale::Maketext::Lexicon>
 
 L<https://github.com/nodeca/babelfish>
 
@@ -535,11 +499,11 @@ L<https://github.com/nodeca/babelfish>
 
 =item *
 
-Igor Mironov <grif@cpan.org>
+Akzhan Abdulin <akzhan@cpan.org>
 
 =item *
 
-Crazy Panda LLC
+Igor Mironov <grif@cpan.org>
 
 =item *
 
@@ -549,7 +513,7 @@ REG.RU LLC
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is Copyright (c) 2014 by Igor Mironov.
+This software is Copyright (c) 2014 by Akzhan Abdulin.
 
 This is free software, licensed under:
 

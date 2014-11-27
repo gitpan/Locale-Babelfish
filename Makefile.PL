@@ -3,15 +3,15 @@
 use strict;
 use warnings;
 
-use 5.008009;
+use 5.010001;
 
 use ExtUtils::MakeMaker 6.30;
 
 
 
 my %WriteMakefileArgs = (
-  "ABSTRACT" => "wrapper between Locale::Maketext::Lexicon and github://nodeca/babelfish format",
-  "AUTHOR" => "Igor Mironov <grif\@cpan.org>, Crazy Panda LLC, REG.RU LLC",
+  "ABSTRACT" => "Perl I18n using github://nodeca/babelfish format.",
+  "AUTHOR" => "Akzhan Abdulin <akzhan\@cpan.org>, Igor Mironov <grif\@cpan.org>, REG.RU LLC",
   "CONFIGURE_REQUIRES" => {
     "ExtUtils::MakeMaker" => "6.30"
   },
@@ -21,10 +21,12 @@ my %WriteMakefileArgs = (
   "NAME" => "Locale::Babelfish",
   "PREREQ_PM" => {
     "Carp" => 0,
-    "Class::Accessor::Grouped" => 0,
-    "Locale::Maketext" => 0,
-    "Modern::Perl" => 0,
-    "YAML::Tiny" => 0,
+    "Class::Accessor::Fast" => 0,
+    "File::Find" => 0,
+    "File::Spec" => 0,
+    "List::Util" => "1.33",
+    "Scalar::Util" => 0,
+    "YAML::Syck" => 0,
     "parent" => 0,
     "strict" => 0,
     "utf8" => 0,
@@ -42,7 +44,7 @@ my %WriteMakefileArgs = (
     "utf8" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.06",
+  "VERSION" => "1.000000",
   "test" => {
     "TESTS" => "t/*.t"
   }
@@ -51,17 +53,18 @@ my %WriteMakefileArgs = (
 
 my %FallbackPrereqs = (
   "Carp" => 0,
-  "Class::Accessor::Grouped" => 0,
+  "Class::Accessor::Fast" => 0,
+  "File::Find" => 0,
   "File::Spec" => 0,
   "File::Temp" => 0,
   "FindBin" => 0,
   "IO::Handle" => 0,
   "IPC::Open3" => 0,
-  "Locale::Maketext" => 0,
-  "Modern::Perl" => 0,
+  "List::Util" => "1.33",
+  "Scalar::Util" => 0,
   "Test::Deep" => 0,
   "Test::More" => "0.98",
-  "YAML::Tiny" => 0,
+  "YAML::Syck" => 0,
   "parent" => 0,
   "strict" => 0,
   "utf8" => 0,
